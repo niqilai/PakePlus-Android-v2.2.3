@@ -1,11 +1,713 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>律师开庭日历</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'PingFang SC','MiSans','Microsoft YaHei',sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            tap-highlight-color: transparent;
+            outline: none;
+        }
+        :root {
+            --neu-bg: #f0f4f8;
+            --neu-primary: #4a6a9f;
+            --neu-secondary: #5b7bae;
+            --neu-text: #333647;
+            --neu-gray: #8a8d98;
+            --neu-light: #ffffff;
+            --neu-dark: #d1d9e6;
+            --neu-red: #c95a5a;
+            --radius: 16px;
+        }
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: var(--neu-bg);
+            padding: 12px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+        @media (orientation: landscape) {
+            .main {
+                max-width: 900px;
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            .cal-box, .file-box {
+                flex: 1;
+                min-width: 400px;
+            }
+        }
+        .main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            margin-top: max(12px, env(safe-area-inset-top));
+        }
+        .setting-container {
+            position: fixed;
+            bottom: calc(20px + env(safe-area-inset-bottom));
+            right: 20px;
+            z-index: 9999;
+        }
+        .setting-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--neu-bg);
+            color: var(--neu-primary);
+            border: none;
+            box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .setting-btn:active {
+            box-shadow: inset 3px 3px 6px var(--neu-dark);
+            transform: scale(0.96);
+        }
+        .setting-menu {
+            position: absolute;
+            bottom: 68px;
+            right: 0;
+            background: var(--neu-bg);
+            border-radius: var(--radius);
+            box-shadow: 6px 6px 12px var(--neu-dark);
+            width: 160px;
+            z-index: 1000;
+            display: none;
+        }
+        .setting-menu-item {
+            padding: 14px 16px;
+            font-size: 14px;
+            color: var(--neu-text);
+            cursor: pointer;
+        }
+        .setting-menu-item:active {
+            background: var(--neu-dark);
+        }
+        .cal-box {
+            background: var(--neu-bg);
+            border-radius: var(--radius);
+            padding: 20px 14px;
+            box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+        }
+        .cal-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 8px;
+        }
+        .cal-nav button {
+            padding: 10px 14px;
+            background: var(--neu-primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+        }
+        #todayBtn {
+            padding: 10px;
+        }
+        .cal-nav h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--neu-text);
+            flex: 1;
+            text-align: center;
+        }
+        .cal-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .cal-table th {
+            padding: 10px 2px;
+            font-size: 12px;
+            color: var(--neu-gray);
+            font-weight: 500;
+        }
+        .cal-table td {
+            padding: 8px 2px;
+            text-align: center;
+            border-radius: var(--radius);
+            height: 60px;
+            position: relative;
+            cursor: pointer;
+        }
+        .cal-table td.active {
+            background: var(--neu-bg)!important;
+            box-shadow: inset 3px 3px 6px var(--neu-dark);
+            color: var(--neu-primary)!important;
+            font-weight: 600;
+        }
+        .cal-table td.today {
+            background: var(--neu-bg);
+            color: var(--neu-primary);
+            font-weight: 600;
+            box-shadow: inset 3px 3px 6px var(--neu-dark);
+        }
+        .cal-table td:empty {
+            pointer-events: none;
+        }
+        .date {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+        }
+        .solar { font-size: 15px; }
+        .lunar { font-size: 7px; color: var(--neu-gray); }
+        .holiday { font-size: 6px; color: var(--neu-red); }
+        .court-tag { font-size: 6px; color: var(--neu-primary); background: rgba(74,106,159,0.1); padding: 1px 3px; border-radius: 3px; }
+        .cal-table td.has-file::after {
+            content: ''; width: 5px; height: 5px; background: var(--neu-primary); border-radius: 50%;
+            position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+        }
+        .file-box {
+            background: var(--neu-bg);
+            border-radius: var(--radius);
+            padding: 20px 14px;
+            box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+        }
+        .date-title {
+            font-size: 16px;
+            color: var(--neu-primary);
+            font-weight: 600;
+        }
+        .upload-btn, .ocr-btn {
+            padding: 16px;
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+        }
+        .upload-btn { background: var(--neu-primary); }
+        .ocr-btn { background: var(--neu-secondary); }
+        .upload-ocr-container {
+            display: flex;
+            gap: 12px;
+        }
+        .upload-ocr-container .upload-btn,
+        .upload-ocr-container .ocr-btn {
+            flex: 1;
+            text-align: center;
+            padding: 16px 8px;
+        }
+        #file { opacity: 0; position: absolute; z-index: -1; }
+        .file-list {
+            max-height: 60vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .file-item-content {
+            padding: 18px;
+            background: var(--neu-bg);
+            border-radius: var(--radius);
+            box-shadow: 3px 3px 6px var(--neu-dark);
+        }
+        .remark {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius);
+            min-height: 130px;
+            background: var(--neu-bg);
+            box-shadow: inset 3px 3px 6px var(--neu-dark);
+            margin: 10px 0;
+            resize: none;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+        .actions button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius);
+            color: #fff;
+            cursor: pointer;
+        }
+        .preview-btn { background: var(--neu-primary); }
+        .delete-btn { background: var(--neu-red); }
+        .empty { text-align: center; padding: 50px 0; color: var(--neu-gray); }
+        .preview-modal-mask {
+            position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7);
+            display:none; justify-content:center; align-items:flex-start; z-index:999999;
+            padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+        }
+        .preview-modal-mask.fullscreen {
+            background: rgba(0,0,0,0.92);
+            align-items: center;
+        }
+        .preview-modal-content {
+            width: 92%; max-width:600px; background:var(--neu-bg); border-radius:var(--radius);
+            max-height: calc(100vh - 80px); overflow:auto;
+        }
+        .preview-modal-close {
+            position: fixed; top:20px; right:20px; width:44px; height:44px; border-radius:50%;
+            background:var(--neu-bg); color:var(--neu-primary); border:none; font-size:22px; cursor:pointer;
+            box-shadow: 3px 3px 6px var(--neu-dark); z-index:9999999;
+        }
+        .preview-modal-body { padding:10px; display:flex; flex-direction:column; align-items:center; }
+        .preview-img { max-width:100%; max-height:calc(100vh - 180px); object-fit:contain; border-radius:var(--radius); }
+        .pdf-container canvas { max-width:100%; max-height:calc(100vh - 180px); width:100% !important; height:auto !important; border-radius:var(--radius); }
+        .pdf-pagination { display:flex; gap:16px; margin-top:16px; align-items:center; }
+        .pdf-page-btn { padding:8px 14px; background:var(--neu-primary); color:#fff; border:none; border-radius:var(--radius); }
+        .pdf-loading { display:flex; flex-direction:column; align-items:center; padding:40px; color:var(--neu-gray); }
+        .loading-spinner { width:40px; height:40px; border:3px solid var(--neu-dark); border-top:3px solid var(--neu-primary); border-radius:50%; animation:spin 1s linear infinite; }
+        @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+        .modal-mask { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; z-index:99999; }
+        .modal-content { background:var(--neu-bg); width:85%; max-width:320px; border-radius:var(--radius); }
+        .modal-body { padding:26px 20px; text-align:center; color:var(--neu-primary); }
+        .modal-footer { display:flex; border-top:1px solid var(--neu-dark); }
+        .modal-btn { flex:1; padding:16px; border:none; background:none; font-weight:bold; cursor:pointer; }
+        .modal-btn-cancel { color:var(--neu-gray); border-right:1px solid var(--neu-dark); }
+        .modal-btn-confirm { color:var(--neu-primary); }
+        .date-select-modal select { width:48%; padding:14px; border:none; border-radius:var(--radius); background:var(--neu-bg); box-shadow:inset 3px 3px 6px var(--neu-dark); }
+        ::-webkit-scrollbar { width:6px; }
+        ::-webkit-scrollbar-thumb { background:var(--neu-dark); border-radius:6px; }
+        html { scrollbar-width:thin; scrollbar-color:var(--neu-dark) transparent; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+</head>
+<body>
+
+<div class="modal-mask" id="modal"><div class="modal-content"><div class="modal-body" id="modal-text"></div><div class="modal-footer" id="modal-footer"></div></div></div>
+<div class="modal-mask" id="dateSelectModal"><div class="modal-content"><div class="modal-body date-select-modal"><div class="select-row"><select id="yearSelect"></select><select id="monthSelect"></select></div></div><div class="modal-footer"><button class="modal-btn modal-btn-cancel" onclick="closeDateSelectModal()">取消</button><button class="modal-btn modal-btn-confirm" onclick="confirmDateSelect()">确定</button></div></div></div>
+<div class="preview-modal-mask" id="previewModal"><button class="preview-modal-close" id="previewModalClose">×</button><div class="preview-modal-content"><div class="preview-modal-body" id="previewModalBody"></div></div></div>
+<input type="file" id="importFile" accept=".json" style="display:none;">
+
+<div class="main">
+    <div class="setting-container">
+        <button class="setting-btn" id="settingBtn">⚙️</button>
+        <div class="setting-menu" id="settingMenu">
+            <div class="setting-menu-item" id="exportSetting">📤 导出备份</div>
+            <div class="setting-menu-item" id="importSetting">📥 导入恢复</div>
+        </div>
+    </div>
+
+    <div class="cal-box">
+        <div class="cal-nav">
+            <button id="prev">← 上月</button>
+            <button id="todayBtn">今日</button>
+            <h2 id="title">2026年4月</h2>
+            <button id="next">下月 →</button>
+        </div>
+        <table class="cal-table"><thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead><tbody id="cal-body"></tbody></table>
+    </div>
+
+    <div class="file-box">
+        <h3>开庭传票管理</h3>
+        <div class="date-title" id="sel-date">请选择开庭日期</div>
+        <div class="upload-ocr-container">
+            <label class="upload-btn" for="file">上传传票</label>
+            <input type="file" id="file" accept="application/pdf,image/jpeg,image/jpg,image/gif,image/webp" multiple>
+            <button class="ocr-btn" id="ocrBtn" disabled>📷 OCR识别全部文字</button>
+        </div>
+        <div class="file-list" id="file-list"><div class="empty">暂无传票文件</div></div>
+    </div>
+</div>
+
+<script>
+// ==============================================
+// 🔥 核心：IndexedDB 替换 localStorage（无大小限制）
+// ==============================================
+const db = new Dexie("CourtCalendarDB");
+db.version(1).stores({
+    files: "date, data"
+});
+
+let fileData = {};
+let curDate = new Date(), selDate = "";
+let pdfDoc = null, currentPdfPage = 1, totalPdfPages = 0;
+let isRendering = false, isOcring = false, isOperating = false;
+const today = new Date();
+const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,0)}-${String(today.getDate()).padStart(2,0)}`;
+
+const modal = document.getElementById('modal');
+const modalText = document.getElementById('modal-text');
+const modalFooter = document.getElementById('modal-footer');
+const ocrBtn = document.getElementById('ocrBtn');
+const settingBtn = document.getElementById('settingBtn');
+const settingMenu = document.getElementById('settingMenu');
+const previewModal = document.getElementById('previewModal');
+const previewModalBody = document.getElementById('previewModalBody');
+
+// 节假日
+const holidays = {
+    '2026-01-01':'元旦','2026-02-17':'春节','2026-02-18':'春节','2026-02-19':'春节','2026-02-20':'春节','2026-02-21':'春节','2026-02-22':'春节','2026-02-23':'春节',
+    '2026-04-05':'清明','2026-05-01':'劳动','2026-06-20':'端午','2026-10-01':'国庆','2026-10-02':'国庆','2026-10-03':'国庆','2026-10-04':'国庆','2026-10-05':'国庆','2026-10-06':'中秋/国庆','2026-10-07':'国庆'
+};
+
+// 防抖
+function debounce(func, wait=500) {
+    let t; return (...args)=>{clearTimeout(t); t=setTimeout(()=>func(...args), wait);}
+}
+
+// ==============================================
+// 🌟 恢复：精准农历日期计算（1900-2100）
+// ==============================================
+function getLunarDate(date) {
+    const solarYear = date.getFullYear();
+    if(solarYear < 1900 || solarYear > 2100) return "未知";
+    const solarMonth = date.getMonth() + 1;
+    const solarDay = date.getDate();
+    
+    const lunarInfo = [
+        0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,
+        0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,
+        0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,
+        0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,
+        0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,
+        0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052d0,0x0a9a8,0x0e950,0x06aa0,
+        0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,
+        0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b5a0,0x195a6,
+        0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,
+        0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x055c0,0x0ab60,0x096d5,0x092e0,
+        0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,
+        0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,
+        0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,
+        0x05aa0,0x076a3,0x096d0,0x04bd7,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,
+        0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0
+    ];
+    const lunarMonthNames = ["正","二","三","四","五","六","七","八","九","十","冬","腊"];
+    const lunarDayNames = ["初一","初二","初三","初四","初五","初六","初七","初八","初九","初十",
+                          "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十",
+                          "廿一","廿二","廿三","廿四","廿五","廿六","廿七","廿八","廿九","三十"];
+
+    let i, leap = 0, temp = 0;
+    let offset = (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(1900, 0, 31)) / 86400000;
+
+    for (i = 1900; i < 2100 && offset > 0; i++) {
+        temp = lYearDays(i);
+        offset -= temp;
+    }
+    if (offset < 0) {
+        offset += temp;
+        i--;
+    }
+    let lunarYear = i;
+    leap = leapMonth(i);
+    let isLeap = false;
+
+    for (i = 1; i < 13 && offset > 0; i++) {
+        if (leap > 0 && i == (leap + 1) && isLeap == false) {
+            --i;
+            isLeap = true;
+            temp = leapDays(lunarYear);
+        } else {
+            temp = monthDays(lunarYear, i);
+        }
+        if (isLeap == true && i == (leap + 1)) isLeap = false;
+        offset -= temp;
+    }
+    if (offset < 0) { offset += temp; --i; }
+    let lunarMonth = i;
+    let lunarDay = offset + 1;
+    return `${lunarMonthNames[lunarMonth-1]}月${lunarDayNames[lunarDay-1]}`;
+
+    function lYearDays(y) {
+        let i, sum = 348;
+        for (i = 0x8000; i > 0x8; i >>= 1) sum += (lunarInfo[y - 1900] & i) ? 1 : 0;
+        return (sum + leapDays(y));
+    }
+    function leapMonth(y) { return (lunarInfo[y - 1900] & 0xf); }
+    function leapDays(y) { return (leapMonth(y) ? ((lunarInfo[y - 1900] & 0x10000) ? 30 : 29) : 0); }
+    function monthDays(y, m) { return ((lunarInfo[y - 1900] & (0x10000 >> m)) ? 30 : 29); }
+}
+
+// ==============================================
+// 存储读写（IndexedDB）
+// ==============================================
+async function loadAll() {
+    const all = await db.files.toArray();
+    fileData = {};
+    all.forEach(row => { fileData[row.date] = row.data; });
+    renderCal(); renderFile();
+}
+
+async function saveToDB(date, data) {
+    await db.files.put({ date, data });
+}
+
+async function deleteFromDB(date) {
+    await db.files.delete(date);
+}
+
+// ==============================================
+// PDF 高清渲染
+// ==============================================
+async function renderPdfPage(pageNum) {
+    if (!pdfDoc || isRendering) return;
+    isRendering = true;
+    previewModalBody.innerHTML = '<div class="pdf-loading"><div class="loading-spinner"></div><div>加载中...</div></div>';
+    const dpr = window.devicePixelRatio || 1;
+    const isFull = previewModal.classList.contains('fullscreen');
+    const cw = isFull ? window.innerWidth : window.innerWidth*0.9;
+    const ch = isFull ? window.innerHeight : window.innerHeight-200;
+    try {
+        const page = await pdfDoc.getPage(pageNum);
+        const vp = page.getViewport({scale:1});
+        const scale = Math.min(cw/vp.width, ch/vp.height) * dpr;
+        const svp = page.getViewport({scale});
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(svp.width);
+        canvas.height = Math.floor(svp.height);
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:svp}).promise;
+        previewModalBody.innerHTML = `<div class='pdf-container'></div>`;
+        previewModalBody.firstChild.appendChild(canvas);
+        const bar = document.createElement('div'); bar.className='pdf-pagination';
+        const prev = document.createElement('button'); prev.className='pdf-page-btn'; prev.innerText='上一页'; prev.disabled=pageNum==1; prev.onclick=()=>renderPdfPage(pageNum-1);
+        const next = document.createElement('button'); next.className='pdf-page-btn'; next.innerText='下一页'; next.disabled=pageNum==totalPdfPages; next.onclick=()=>renderPdfPage(pageNum+1);
+        const info = document.createElement('div'); info.innerText=`${pageNum}/${totalPdfPages}`;
+        bar.append(prev,info,next); previewModalBody.appendChild(bar);
+        canvas.onclick=()=>previewModal.classList.toggle('fullscreen');
+    } catch(e) { previewModalBody.innerHTML='<div class="pdf-loading">加载失败</div>'; }
+    isRendering=false;
+}
+
+async function openPdfPreview(base64) {
+    try {
+        const blob = await (await fetch(base64)).blob();
+        const buf = await blob.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument(new Uint8Array(buf)).promise;
+        totalPdfPages = pdfDoc.numPages;
+        previewModal.style.display='flex';
+        renderPdfPage(1);
+    } catch(e) { showAlert('PDF预览失败：加密或损坏'); }
+}
+
+// ==============================================
+// 🌟 恢复：Base64转Blob工具函数（OCR/PDF必备）
+// ==============================================
+function base64ToBlob(base64) {
+    const [head, data] = base64.split(';base64,');
+    const type = head.split(':')[1];
+    const raw = atob(data);
+    const u8 = new Uint8Array(raw.length);
+    for (let i=0; i<raw.length; i++) u8[i] = raw.charCodeAt(i);
+    return new Blob([u8], { type });
+}
+
+// ==============================================
+// 🌟 恢复：OCR文字识别完整功能
+// ==============================================
+ocrBtn.addEventListener('click', debounce(ocrAutoFill));
+async function ocrAutoFill() {
+    if(isOcring) return;
+    if (!selDate || !fileData[selDate]?.length) { showAlert('请先选择日期并上传文件！'); return; }
+    isOcring = true;
+    ocrBtn.disabled = true; ocrBtn.innerText = '⏳ 识别中...';
+    let successCount = 0; const total = fileData[selDate].length;
+    try {
+        for (let i=0; i<total; i++) {
+            try {
+                const item = fileData[selDate][i];
+                let text = '';
+                if (item.type.startsWith('image')) {
+                    const blob = base64ToBlob(item.base64);
+                    const url = URL.createObjectURL(blob);
+                    text = (await Tesseract.recognize(url, 'chi_sim')).data.text.trim() || '未识别到文字';
+                    URL.revokeObjectURL(url);
+                } else {
+                    text = await pdfToText(item.base64);
+                }
+                fileData[selDate][i].remark = `📝 OCR识别结果：\n${text}`;
+                successCount++;
+            }catch(e){
+                console.error('单文件OCR失败',e);
+            }
+        }
+        await saveToDB(selDate, fileData[selDate]);
+        renderFile();
+        showAlert(`✅ 识别完成！成功 ${successCount}/${total}`);
+    } catch (e) { console.error(e); showAlert('❌ 识别失败'); }
+    finally { isOcring = false; ocrBtn.disabled = false; ocrBtn.innerText = '📷 OCR识别全部文字'; }
+}
+
+// PDF提取文字
+async function pdfToText(base64) {
+    try {
+        const blob = base64ToBlob(base64);
+        const buf = await blob.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(new Uint8Array(buf)).promise;
+        let text = '';
+        for (let i=1; i<=pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            text += (await page.getTextContent()).items.map(j=>j.str).join('') + '\n';
+        }
+        return text.trim() || 'PDF未识别到文字';
+    } catch (e) { return 'PDF识别失败'; }
+}
+
+// ==============================================
+// 预览/删除/上传
+// ==============================================
+function previewFile(idx) {
+    const item = fileData[selDate][idx];
+    previewModalBody.innerHTML='';
+    if (item.type.startsWith('image')) {
+        const img = document.createElement('img'); img.className='preview-img'; img.src=item.base64;
+        img.onload=()=>{previewModalBody.appendChild(img); img.onclick=()=>previewModal.classList.toggle('fullscreen');};
+        previewModal.style.display='flex';
+    } else {
+        openPdfPreview(item.base64);
+    }
+}
+
+const deleteFile = debounce(async (idx)=>{
+    fileData[selDate].splice(idx,1);
+    if (fileData[selDate].length===0) {
+        delete fileData[selDate];
+        await deleteFromDB(selDate);
+    } else {
+        await saveToDB(selDate, fileData[selDate]);
+    }
+    renderCal(); renderFile();
+    showAlert('删除成功');
+});
+
+document.getElementById('file').addEventListener('change', async (e)=>{
+    if (!selDate) return;
+    const files = Array.from(e.target.files);
+    if (!fileData[selDate]) fileData[selDate] = [];
+    for (const f of files) {
+        if (f.size>80*1024*1024) { showAlert(f.name+' 超过80MB'); continue; }
+        if (fileData[selDate].some(x=>x.name===f.name)) continue;
+        const base64 = await new Promise(r=>{const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(f);});
+        fileData[selDate].push({
+            name:f.name,
+            type:f.type,
+            base64,
+            remark:''
+        });
+    }
+    await saveToDB(selDate, fileData[selDate]);
+    renderCal(); renderFile();
+    e.target.value='';
+});
+
+// ==============================================
+// 界面渲染 & 日历（已恢复农历显示）
+// ==============================================
+function renderCal() {
+    const y = curDate.getFullYear(), m=curDate.getMonth();
+    document.getElementById('title').innerText=`${y}年${m+1}月`;
+    const first = new Date(y,m,1).getDay();
+    const days = new Date(y,m+1,0).getDate();
+    let html='', day=1;
+    const rows = Math.ceil((first+days)/7);
+    for (let i=0; i<rows; i++) {
+        html+='<tr>';
+        for (let j=0; j<7; j++) {
+            if (i==0&&j<first) { html+='<td></td>'; continue; }
+            if (day>days) { html+='<td></td>'; continue; }
+            const ds = `${y}-${String(m+1).padStart(2,0)}-${String(day).padStart(2,0)}`;
+            const has = fileData[ds]?.length>0;
+            const todayCls = ds===todayStr ? 'today' : '';
+            const actCls = ds===selDate ? 'active' : '';
+            const hd = holidays[ds]||'';
+            // 🌟 恢复农历显示
+            const lunar = getLunarDate(new Date(y,m,day));
+            html+=`<td data-date="${ds}" class="${todayCls} ${actCls} ${has?'has-file':''}">
+                <div class="date">
+                    <div class="solar">${day}</div>
+                    <div class="lunar">${lunar}</div>
+                    ${hd?`<div class="holiday">${hd}</div>`:''}
+                    ${has?'<div class="court-tag">有传票</div>':''}
+                </div>
+            </td>`;
+            day++;
+        }
+        html+='</tr>';
+    }
+    document.getElementById('cal-body').innerHTML=html;
+    document.querySelectorAll('td[data-date]').forEach(td=>{
+        td.onclick=()=>{
+            previewModal.style.display='none';
+            selDate=td.dataset.date;
+            document.getElementById('sel-date').innerText=`选中：${selDate}`;
+            document.querySelectorAll('td.active').forEach(x=>x.classList.remove('active'));
+            td.classList.add('active');
+            renderFile();
+        };
+    });
+}
+
+function renderFile() {
+    const list = document.getElementById('file-list');
+    if (!selDate || !fileData[selDate] || fileData[selDate].length===0) {
+        list.innerHTML='<div class="empty">暂无传票文件</div>';
+        ocrBtn.disabled=true;
+        return;
+    }
+    ocrBtn.disabled=false;
+    let html='';
+    fileData[selDate].forEach((it,idx)=>{
+        html+=`<div class="file-item"><div class="file-item-content">
+            <div class="file-name">${it.name}</div>
+            <textarea class="remark" data-idx="${idx}" placeholder="备注">${it.remark||''}</textarea>
+            <div class="actions">
+                <button class="preview-btn" onclick="previewFile(${idx})">预览</button>
+                <button class="delete-btn" onclick="deleteFile(${idx})">删除</button>
+            </div>
+        </div></div>`;
+    });
+    list.innerHTML=html;
+    document.querySelectorAll('.remark').forEach(t=>{
+        t.oninput=debounce(async ()=>{
+            fileData[selDate][t.dataset.idx].remark = t.value;
+            await saveToDB(selDate, fileData[selDate]);
+        });
+    });
+}
+
+// ==============================================
+// 弹窗 & 工具
+// ==============================================
+function showAlert(text) {
+    modalText.innerText=text;
+    modalFooter.innerHTML='<button class="modal-btn modal-btn-confirm" onclick="modal.style.display=\'none\'">确定</button>';
+    modal.style.display='flex';
+}
+function closePreviewModal() { previewModal.style.display='none'; if(pdfDoc)pdfDoc.destroy(); pdfDoc=null; }
+document.getElementById('previewModalClose').onclick=closePreviewModal;
+document.getElementById('prev').onclick=()=>{curDate.setMonth(curDate.getMonth()-1); renderCal();};
+document.getElementById('next').onclick=()=>{curDate.setMonth(curDate.getMonth()+1); renderCal();};
+document.getElementById('todayBtn').onclick=()=>{curDate=new Date(); renderCal();};
+
+settingBtn.onclick=()=>{settingMenu.style.display=settingMenu.style.display=='block'?'none':'block';};
+document.onclick=(e)=>{if(!settingBtn.contains(e.target))settingMenu.style.display='none';};
+
+// ==============================================
+// 启动
+// ==============================================
+window.onload=async ()=>{
+    await loadAll();
+    renderCal();
+};
+</script>
+</body>
 </html>
